@@ -1,0 +1,44 @@
+{
+  "title": "督办服务停机快照契约",
+  "description": "GovernanceService.snapshot() 导出、restore() 重建所依据的最小顶层结构。明细记录为追加式数据类对象，允许扩展字段，但下列键必须存在。",
+  "type": "object",
+  "required": [
+    "seq",
+    "wall",
+    "events",
+    "suggestions",
+    "groups",
+    "decisions",
+    "tasks",
+    "links",
+    "actions",
+    "escalations",
+    "false_requests",
+    "transfers",
+    "reevaluations",
+    "verifications",
+    "event_case",
+    "service"
+  ],
+  "properties": {
+    "seq": { "type": "integer", "minimum": 0 },
+    "wall": { "type": "integer", "minimum": 0 },
+    "events": { "type": "array" },
+    "suggestions": { "type": "array" },
+    "groups": { "type": "array" },
+    "decisions": { "type": "array" },
+    "tasks": { "type": "array" },
+    "links": { "type": "array" },
+    "actions": { "type": "array" },
+    "escalations": { "type": "array" },
+    "false_requests": { "type": "array" },
+    "transfers": { "type": "array" },
+    "reevaluations": { "type": "array" },
+    "verifications": { "type": "object" },
+    "event_case": { "type": "object" },
+    "service": {
+      "type": "object",
+      "required": ["units", "actors", "version_maintainers"]
+    }
+  }
+}
