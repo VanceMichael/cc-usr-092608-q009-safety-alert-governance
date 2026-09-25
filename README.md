@@ -21,6 +21,33 @@
 
 `contracts/context.schema.json` 描述资料结构，`fixtures/context.json` 提供不含真实身份信息的示例，`src/safety_context.py` 负责读取和校验这些资料。
 
+## 服务模块
+
+纯 Python 标准库实现（Python ≥ 3.11），无需外部服务：
+
+| 模块 | 职责 |
+| --- | --- |
+| `src/models.py` | 来源事件、案件、工单、误报复核等值对象与错误类型 |
+| `src/repository.py` | 追加式事件日志（JSONL）、重放恢复、幂等索引、责任链版本号 |
+| `src/correlation.py` | 多源事件的关联建议与可解释理由（只建议，不自动合并） |
+| `src/verification.py` | 充停位置/动火资质/积水阈值/保险承诺四套独立核验规则 |
+| `src/minimization.py` | 按履责目的递归脱敏的转派证据包 |
+| `src/service.py` | 接入、裁决、立案、阶段、升级、转派、再评估、误报治理、恢复查询 |
+
+## 核心不变量
+
+1. **来源事件原样留存**：报文、观测时刻、接收时刻逐字保存，不可修改删除；相同 `dedupe_key` 再次到达只返回旧记录，不新建工单。
+2. **系统只建议，人工裁决**：关联建议带分数与理由；同一风险、相互独立、算法误报均由人工决定。
+3. **自动结论只辅助立案**：即便核验建议立案，未经人工确认也不产生工单。
+4. **唯一当前责任单位**：立案必须明确责任单位与到场期限；转派后原领取人清空，由接收单位重新派人。
+5. **阶段严格依次追加**：临时控制→整改→复核→解除，不可跳序、回退或重复解除。
+6. **命令时刻单调**：迟到的气象/定位数据可触发再评估与后续措施，但 `command_issued_at` 不得早于既有命令，杜绝把新措施伪造成"当时已下达"。
+7. **最小披露转派**：证据包按"积水排导/保险服务/联合执法/现场救援"等履责目的组装；身份证、家庭人口等字段一律剔除，联络信息仅在救援目的下脱敏保留。库内原始证据不受影响。
+8. **职责分离**：登记算法版本维护人；维护人不能审批关闭本版本集中产生的异常，申请人也不能自批，必须非维护第二人复核。
+9. **并发防分叉**：领取、升级、合并、转派、阶段追加均须携带所见责任链版本号，过期提交抛 `ChainConflictError`。
+10. **停机恢复**：重放 JSONL 日志即还原全部状态；逾期任务、待复核误报自动重新出现，并可继续处置。
+11. **版本影响分析**：按算法版本列出确认误报、待复核、可能受影响的历史事件与案件，支撑批量排查。
+
 ## 开发命令
 
 运行测试：
@@ -32,7 +59,17 @@ python3 -m unittest discover -s tests -v
 编译检查：
 
 ```bash
-python3 -m compileall -q src
+python3 -m compileall -q src tests
 ```
 
 两条命令只读取仓库内文件，不需要连接外部业务系统。
+
+## 事件类型
+
+状态演进全部走追加事件（`src/repository.py`）：
+
+`event.received` → `algorithm.registered` → `case.opened` →
+`correlation.suggested` → `case.decided` / `false_alarm.proposed` →
+`false_alarm.reviewed` → `verification.recorded` →
+`work_order.created` / `.assigned` / `.escalated` / `.transferred` /
+`stage.appended` / `measure.reevaluated`。
